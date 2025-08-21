@@ -1,3 +1,22 @@
+# Users-Tasks API
+
+A NestJS REST API for managing users and their tasks with PostgreSQL database.
+
+## Features
+
+- 👤 User management (CRUD)
+- 📝 Task management (CRUD)
+- 🔗 One-to-Many relationships
+- ✅ Request validation
+- 🗃️ PostgreSQL with TypeORM
+
+## Setup
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
