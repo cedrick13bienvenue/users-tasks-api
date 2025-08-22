@@ -9,6 +9,7 @@ import {
   ValidationPipe,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { 
   ApiTags, 
@@ -16,18 +17,27 @@ import {
   ApiResponse, 
   ApiParam,
   ApiBody,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { User } from './entities/user.entity';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/user.decorator';
+import { UserRole } from './enums/user-role.enum';
 
 @ApiTags('users')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a new user' })
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Create a new user (Admin only)' })
   @ApiResponse({ 
     status: 201, 
     description: 'User successfully created',
@@ -37,24 +47,57 @@ export class UsersController {
     status: 400, 
     description: 'Bad request - validation failed' 
   })
+  @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized' 
+  })
+  @ApiResponse({ 
+    status: 403, 
+    description: 'Forbidden - Admin role required' 
+  })
   @ApiBody({ type: CreateUserDto })
-  create(@Body(ValidationPipe) createUserDto: CreateUserDto) {
+  create(@Body(ValidationPipe) createUserDto: CreateUserDto): Promise<User> {
     return this.usersService.create(createUserDto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all users' })
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get all users (Admin only)' })
   @ApiResponse({ 
     status: 200, 
     description: 'List of all users',
     type: [User],
   })
-  findAll() {
+  @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized' 
+  })
+  @ApiResponse({ 
+    status: 403, 
+    description: 'Forbidden - Admin role required' 
+  })
+  findAll(): Promise<User[]> {
     return this.usersService.findAll();
   }
 
+  @Get('profile')
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'User profile with tasks',
+    type: User,
+  })
+  @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized' 
+  })
+  getProfile(@CurrentUser() user: User): Promise<User> {
+    return this.usersService.findOne(user.id);
+  }
+
   @Get(':id')
-  @ApiOperation({ summary: 'Get a user by ID with their tasks' })
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get a user by ID with their tasks (Admin only)' })
   @ApiParam({ 
     name: 'id', 
     type: 'number', 
@@ -67,16 +110,25 @@ export class UsersController {
     type: User,
   })
   @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized' 
+  })
+  @ApiResponse({ 
+    status: 403, 
+    description: 'Forbidden - Admin role required' 
+  })
+  @ApiResponse({ 
     status: 404, 
     description: 'User not found' 
   })
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  findOne(@Param('id', ParseIntPipe) id: number): Promise<User> {
     return this.usersService.findOne(id);
   }
 
   @Delete(':id')
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a user by ID' })
+  @ApiOperation({ summary: 'Delete a user by ID (Admin only)' })
   @ApiParam({ 
     name: 'id', 
     type: 'number', 
@@ -88,10 +140,18 @@ export class UsersController {
     description: 'User successfully deleted' 
   })
   @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized' 
+  })
+  @ApiResponse({ 
+    status: 403, 
+    description: 'Forbidden - Admin role required' 
+  })
+  @ApiResponse({ 
     status: 404, 
     description: 'User not found' 
   })
-  remove(@Param('id', ParseIntPipe) id: number) {
+  remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
     return this.usersService.remove(id);
   }
 }
