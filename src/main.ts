@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
@@ -13,13 +14,28 @@ async function bootstrap() {
     transform: true,
   }));
 
+  // Global serializer interceptor to handle @Exclude decorators
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+
   // Swagger configuration
   const config = new DocumentBuilder()
     .setTitle('Users-Tasks API')
-    .setDescription('A comprehensive NestJS REST API for managing users and their tasks')
+    .setDescription('A comprehensive NestJS REST API for managing users and their tasks with JWT authentication and RBAC')
     .setVersion('1.0')
-    .addTag('users', 'User management operations')
-    .addTag('tasks', 'Task management operations')
+    .addTag('auth', 'Authentication endpoints (login, signup)')
+    .addTag('users', 'User management operations (Admin only + user profile)')
+    .addTag('tasks', 'Task management operations (User-scoped with pagination)')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth', // This name here is important for matching up with @ApiBearerAuth() in your controller!
+    )
     .addServer('http://localhost:3000', 'Development server')
     .build();
 
