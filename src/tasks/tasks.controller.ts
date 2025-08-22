@@ -6,10 +6,12 @@ import {
   Delete,
   Body, 
   Param, 
+  Query,
   ParseIntPipe,
   ValidationPipe,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { 
   ApiTags, 
@@ -17,13 +19,26 @@ import {
   ApiResponse, 
   ApiParam,
   ApiBody,
+  ApiQuery,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { Task } from './entities/task.entity';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { TaskOwnershipGuard } from '../auth/guards/task-ownership.guard';
+import { CurrentUser } from '../auth/decorators/user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { User } from '../users/entities/user.entity';
+import { UserRole } from '../users/enums/user-role.enum';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 
 @ApiTags('tasks')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
@@ -37,26 +52,42 @@ export class TasksController {
   })
   @ApiResponse({ 
     status: 400, 
-    description: 'Bad request - validation failed or user not found' 
+    description: 'Bad request - validation failed' 
+  })
+  @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized' 
   })
   @ApiBody({ type: CreateTaskDto })
-  create(@Body(ValidationPipe) createTaskDto: CreateTaskDto) {
-    return this.tasksService.create(createTaskDto);
+  create(
+    @Body(ValidationPipe) createTaskDto: CreateTaskDto,
+    @CurrentUser() user: User,
+  ): Promise<Task> {
+    return this.tasksService.create(createTaskDto, user);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all tasks with user information' })
+  @ApiOperation({ summary: 'Get all tasks with pagination (users see only their tasks, admins see all)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page', example: 10 })
   @ApiResponse({ 
     status: 200, 
-    description: 'List of all tasks with user details',
-    type: [Task],
+    description: 'Paginated list of tasks',
+    type: PaginatedResponseDto<Task>,
   })
-  findAll() {
-    return this.tasksService.findAll();
+  @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized' 
+  })
+  findAll(
+    @CurrentUser() user: User,
+    @Query(ValidationPipe) paginationDto: PaginationDto,
+  ): Promise<PaginatedResponseDto<Task>> {
+    return this.tasksService.findAll(user, paginationDto);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get a task by ID with user information' })
+  @ApiOperation({ summary: 'Get a task by ID (users can only access their own tasks)' })
   @ApiParam({ 
     name: 'id', 
     type: 'number', 
@@ -65,19 +96,31 @@ export class TasksController {
   })
   @ApiResponse({ 
     status: 200, 
-    description: 'Task found with user information',
+    description: 'Task found',
     type: Task,
+  })
+  @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized' 
+  })
+  @ApiResponse({ 
+    status: 403, 
+    description: 'Forbidden - not your task' 
   })
   @ApiResponse({ 
     status: 404, 
     description: 'Task not found' 
   })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.tasksService.findOne(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: User,
+  ): Promise<Task> {
+    return this.tasksService.findOne(id, user);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update task status' })
+  @UseGuards(TaskOwnershipGuard)
+  @ApiOperation({ summary: 'Update task status (users can only update their own tasks)' })
   @ApiParam({ 
     name: 'id', 
     type: 'number', 
@@ -88,6 +131,14 @@ export class TasksController {
     status: 200, 
     description: 'Task successfully updated',
     type: Task,
+  })
+  @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized' 
+  })
+  @ApiResponse({ 
+    status: 403, 
+    description: 'Forbidden - not your task' 
   })
   @ApiResponse({ 
     status: 404, 
@@ -101,13 +152,15 @@ export class TasksController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body(ValidationPipe) updateTaskDto: UpdateTaskDto,
-  ) {
-    return this.tasksService.update(id, updateTaskDto);
+    @CurrentUser() user: User,
+  ): Promise<Task> {
+    return this.tasksService.update(id, updateTaskDto, user);
   }
 
   @Delete(':id')
+  @UseGuards(TaskOwnershipGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a task by ID' })
+  @ApiOperation({ summary: 'Delete a task by ID (users can only delete their own tasks)' })
   @ApiParam({ 
     name: 'id', 
     type: 'number', 
@@ -119,10 +172,21 @@ export class TasksController {
     description: 'Task successfully deleted' 
   })
   @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized' 
+  })
+  @ApiResponse({ 
+    status: 403, 
+    description: 'Forbidden - not your task' 
+  })
+  @ApiResponse({ 
     status: 404, 
     description: 'Task not found' 
   })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.tasksService.remove(id);
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: User,
+  ): Promise<void> {
+    return this.tasksService.remove(id, user);
   }
 }
