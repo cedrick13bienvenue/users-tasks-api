@@ -1,6 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, BeforeInsert, BeforeUpdate } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
+import { Exclude } from 'class-transformer';
+import * as bcrypt from 'bcrypt';
 import { Task } from '../../tasks/entities/task.entity';
+import { UserRole } from '../enums/user-role.enum';
 
 @Entity('users')
 export class User {
@@ -25,12 +28,21 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @ApiProperty({
-    description: 'The password of the user (hashed)',
-    example: 'hashedPassword123',
-  })
+  @Exclude()
   @Column()
   password: string;
+
+  @ApiProperty({
+    description: 'The role of the user',
+    enum: UserRole,
+    example: UserRole.USER,
+  })
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.USER,
+  })
+  role: UserRole;
 
   @ApiProperty({
     description: 'List of tasks belonging to this user',
@@ -38,4 +50,17 @@ export class User {
   })
   @OneToMany(() => Task, (task) => task.user)
   tasks: Task[];
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  async hashPassword() {
+    if (this.password) {
+      const salt = await bcrypt.genSalt(10);
+      this.password = await bcrypt.hash(this.password, salt);
+    }
+  }
+
+  async comparePassword(plainPassword: string): Promise<boolean> {
+    return bcrypt.compare(plainPassword, this.password);
+  }
 }
