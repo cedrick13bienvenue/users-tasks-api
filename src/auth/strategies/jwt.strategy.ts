@@ -20,7 +20,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private usersService: UsersService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        // First try to extract from Authorization header with Bearer
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        // Then try to extract from custom header or query parameter
+        (request) => {
+          // Check if token is passed without Bearer prefix
+          const authHeader = request.headers.authorization;
+          if (authHeader && !authHeader.startsWith('Bearer ')) {
+            return authHeader; // Return the token directly
+          }
+          return null;
+        },
+        // Also check query parameter for easier testing
+        (request) => {
+          return request.query.token || null;
+        }
+      ]),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_SECRET') || 'your-secret-key',
     });

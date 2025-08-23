@@ -29,7 +29,7 @@ import { CurrentUser } from '../auth/decorators/user.decorator';
 import { UserRole } from './enums/user-role.enum';
 
 @ApiTags('users')
-@ApiBearerAuth()
+@ApiBearerAuth('jwt')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {

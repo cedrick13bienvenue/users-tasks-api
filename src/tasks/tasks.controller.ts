@@ -37,7 +37,7 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
 
 @ApiTags('tasks')
-@ApiBearerAuth()
+@ApiBearerAuth('jwt')
 @UseGuards(JwtAuthGuard)
 @Controller('tasks')
 export class TasksController {

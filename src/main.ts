@@ -34,10 +34,10 @@ async function bootstrap() {
           scheme: 'bearer',
           bearerFormat: 'JWT',
           name: 'JWT',
-          description: 'Enter JWT token',
+          description: 'Enter JWT token (with or without "Bearer " prefix)',
           in: 'header',
         },
-        'JWT-auth', // This name here is important for matching up with @ApiBearerAuth() in your controller!
+        'jwt', // This name here is important for matching up with @ApiBearerAuth() in your controller!
       )
       .addServer('http://localhost:3000', 'Development server')
       .build();
