@@ -33,16 +33,15 @@ export class UsersService {
     return user;
   }
 
-  async findByEmail(email: string): Promise<User> {
-    const user = await this.usersRepository.findOne({
-      where: { email },
-    });
-    
-    if (!user) {
-      throw new NotFoundException(`User with email ${email} not found`);
+  async findByEmail(email: string): Promise<User | null> {
+    try {
+      const user = await this.usersRepository.findOne({
+        where: { email },
+      });
+      return user || null;
+    } catch (error) {
+      return null;
     }
-    
-    return user;
   }
 
   async remove(id: number): Promise<void> {
