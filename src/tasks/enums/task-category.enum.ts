@@ -1,0 +1,11 @@
+export enum TaskCategory {
+  WORK = 'WORK',
+  PERSONAL = 'PERSONAL',
+  HEALTH = 'HEALTH',
+  FINANCE = 'FINANCE',
+  LEARNING = 'LEARNING',
+  SHOPPING = 'SHOPPING',
+  TRAVEL = 'TRAVEL',
+  HOME = 'HOME',
+  OTHER = 'OTHER'
+}
