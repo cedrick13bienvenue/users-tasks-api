@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Task } from './entities/task.entity';
@@ -8,20 +8,58 @@ import { User } from '../users/entities/user.entity';
 import { UserRole } from '../users/enums/user-role.enum';
 import { PaginationDto } from '../common/dto/pagination.dto';
 import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
+import { EnhancedAiTaskAnalyzerService } from './services/ai-task-analyzer.service';
 
 @Injectable()
 export class TasksService {
+  private readonly logger = new Logger(TasksService.name);
+
   constructor(
     @InjectRepository(Task)
     private tasksRepository: Repository<Task>,
+    private enhancedAiAnalyzer: EnhancedAiTaskAnalyzerService,
   ) {}
 
   async create(createTaskDto: CreateTaskDto, user: User): Promise<Task> {
-    const task = this.tasksRepository.create({
+    this.logger.debug(`Creating task for user ${user.email}: ${createTaskDto.title}`);
+
+    // Use Enhanced AI analyzer with NLP for better priority and category detection
+    let priority = createTaskDto.priority;
+    let category = createTaskDto.category;
+    let aiConfidence: number | null = null;
+    let aiReasoning: string[] | null = null;
+    let nlpInsights: any = null;
+
+    if (!priority || !category) {
+      this.logger.debug('Running Enhanced NLP analysis for automatic priority and category detection');
+      const analysis = this.enhancedAiAnalyzer.analyzeTask(
+        createTaskDto.title,
+        createTaskDto.description
+      );
+      
+      priority = priority || analysis.priority;
+      category = category || analysis.category;
+      aiConfidence = analysis.confidence;
+      aiReasoning = analysis.reasoning;
+      nlpInsights = analysis.nlpInsights;
+      
+      this.logger.debug(`Enhanced NLP analysis result: Priority=${priority}, Category=${category}, Confidence=${aiConfidence}, Sentiment=${nlpInsights?.sentiment}`);
+    }
+
+    const task = new Task();
+    Object.assign(task, {
       ...createTaskDto,
+      priority,
+      category,
+      aiConfidence,
+      aiReasoning,
       userId: user.id,
     });
-    return await this.tasksRepository.save(task);
+
+    const savedTask = await this.tasksRepository.save(task);
+    this.logger.log(`Task created successfully: ${savedTask.title} (ID: ${savedTask.id})`);
+    
+    return savedTask;
   }
 
   async findAll(user: User, paginationDto: PaginationDto): Promise<PaginatedResponseDto<Task>> {
